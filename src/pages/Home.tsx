@@ -9,20 +9,32 @@ import {
   Paper,
   CircularProgress,
   IconButton,
+  Button,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { Movie, MovieDetails as MovieDetailsType } from '../types/movie';
 import { MovieCard } from '../components/MovieCard';
 import { movieService } from '../services/movieService';
 import { IMAGE_BASE_URL } from '../config/api';
+import StarIcon from '@mui/icons-material/Star';
 
-export const Home: React.FC = () => {
+interface HomeProps {
+  searchQuery: string;
+}
+
+export const Home: React.FC<HomeProps> = ({ searchQuery }) => {
   const { movieId } = useParams<{ movieId: string }>();
   const navigate = useNavigate();
   const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
   const [topRatedMovies, setTopRatedMovies] = useState<Movie[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<MovieDetailsType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchResults, setSearchResults] = useState<Movie[]>([]);
+
+  const handleClose = () => {
+    setSelectedMovie(null);
+    navigate('/');
+  };
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -57,6 +69,23 @@ export const Home: React.FC = () => {
     fetchMovieDetails();
   }, [movieId]);
 
+  useEffect(() => {
+    const searchMovies = async () => {
+      if (!searchQuery) {
+        setSearchResults([]);
+        return;
+      }
+      try {
+        const results = await movieService.searchMovies(searchQuery);
+        setSearchResults(results.results);
+      } catch (error) {
+        console.error('Error searching movies:', error);
+      }
+    };
+
+    searchMovies();
+  }, [searchQuery]);
+
   if (loading) {
     return (
       <Container sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
@@ -68,14 +97,36 @@ export const Home: React.FC = () => {
   return (
     <Container>
       {selectedMovie && (
-        <Paper sx={{ mb: 4, position: 'relative' }}>
+        <Paper
+          sx={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '90%',
+            maxWidth: '1200px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            zIndex: 1000,
+            boxShadow: 24,
+          }}
+        >
           <IconButton
-            onClick={() => navigate('/')}
-            sx={{ position: 'absolute', right: 8, top: 8, zIndex: 1 }}
+            onClick={handleClose}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              zIndex: 1,
+              bgcolor: 'background.paper',
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+            }}
           >
             <CloseIcon />
           </IconButton>
-          <Box sx={{ py: 2 }}>
+          <Box sx={{ p: 3 }}>
             <Grid container spacing={3}>
               <Grid item xs={12} md={3}>
                 <img
@@ -114,9 +165,12 @@ export const Home: React.FC = () => {
                     <Typography variant="caption" color="text.secondary" display="block">
                       Rating
                     </Typography>
-                    <Typography variant="body2">
-                      {selectedMovie.vote_average.toFixed(1)}/10
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <StarIcon sx={{ color: '#FFB400', fontSize: '1.2rem' }} />
+                      <Typography variant="body2">
+                        {selectedMovie.vote_average.toFixed(1)}
+                      </Typography>
+                    </Box>
                   </Grid>
                   <Grid item xs={6} sm={3}>
                     <Typography variant="caption" color="text.secondary" display="block">
@@ -138,32 +192,113 @@ export const Home: React.FC = () => {
           </Box>
         </Paper>
       )}
+      {selectedMovie && (
+        <Box
+          sx={{
+            position: 'fixed',
+            bgcolor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+          }}
+          onClick={handleClose}
+        />
+      )}
 
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Popular Movies
-        </Typography>
-        <Grid container spacing={3}>
-          {popularMovies.map((movie) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={movie.id}>
-              <MovieCard movie={movie} />
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
+      {searchQuery ? (
+        <Box sx={{ my: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+            <Button
+              variant="outlined"
+              onClick={() => window.location.reload()}
+              sx={{ mb: 2 }}
+            >
+              Home
+            </Button>
+          </Box>
+          <Typography variant="h4" component="h1" gutterBottom align="center">
+            Search Results
+          </Typography>
+          {searchResults.length > 0 ? (
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+                margin: -1.5,
+              }}
+            >
+              {searchResults.map((movie) => (
+                <Box
+                  key={movie.id}
+                  sx={{
+                    width: { xs: '100%', sm: '30%', md: '25%', lg: '20%' },
+                    padding: 1.5,
+                  }}
+                >
+                  <MovieCard movie={movie} />
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="h6" align="center" color="text.secondary" sx={{ mt: 4 }}>
+              No movies found for "{searchQuery}"
+            </Typography>
+          )}
+        </Box>
+      ) : (
+        <>
+          <Box sx={{ my: 4 }}>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Popular Movies
+            </Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+                margin: -1.5,
+              }}
+            >
+              {popularMovies.map((movie) => (
+                <Box
+                  key={movie.id}
+                  sx={{
+                    width: { xs: '100%', sm: '30%', md: '25%', lg: '20%' },
+                    padding: 1.5,
+                  }}
+                >
+                  <MovieCard movie={movie} />
+                </Box>
+              ))}
+            </Box>
+          </Box>
 
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h4" component="h2" gutterBottom>
-          Top Rated Movies
-        </Typography>
-        <Grid container spacing={3}>
-          {topRatedMovies.map((movie) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={movie.id}>
-              <MovieCard movie={movie} />
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
+          <Box sx={{ my: 4 }}>
+            <Typography variant="h4" component="h2" gutterBottom>
+              Top Rated Movies
+            </Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+                margin: -1.5,
+              }}
+            >
+              {topRatedMovies.map((movie) => (
+                <Box
+                  key={movie.id}
+                  sx={{
+                    width: { xs: '100%', sm: '30%', md: '25%', lg: '20%' },
+                    padding: 1.5,
+                  }}
+                >
+                  <MovieCard movie={movie} />
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </>
+      )}
     </Container>
   );
 }; 

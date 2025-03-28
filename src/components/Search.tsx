@@ -10,9 +10,12 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import { Movie } from '../types/movie';
 import { movieService } from '../services/movieService';
-import { MovieCard } from './MovieCard';
 
-export const Search: React.FC = () => {
+interface SearchProps {
+  onSearch: (query: string) => void;
+}
+
+export const Search: React.FC<SearchProps> = ({ onSearch }) => {
   const [query, setQuery] = useState('');
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,9 +41,12 @@ export const Search: React.FC = () => {
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Search movies..."
+          placeholder="Search movie title..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onSearch(e.target.value);
+          }}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
@@ -52,20 +58,6 @@ export const Search: React.FC = () => {
           }}
         />
       </form>
-
-      {loading ? (
-        <Typography sx={{ my: 4 }}>Searching...</Typography>
-      ) : movies.length > 0 ? (
-        <Grid container spacing={3} sx={{ mt: 2 }}>
-          {movies.map((movie) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={movie.id}>
-              <MovieCard movie={movie} />
-            </Grid>
-          ))}
-        </Grid>
-      ) : query ? (
-        <Typography sx={{ my: 4 }}>No movies found</Typography>
-      ) : null}
     </Box>
   );
 }; 
