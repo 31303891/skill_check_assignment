@@ -36,7 +36,7 @@ export const Search: React.FC<SearchProps> = ({ onSearch }) => {
   };
 
   return (
-    <Box sx={{ my: 4 }}>
+    <Box sx={{ my: 5 }}>
       <form onSubmit={handleSearch}>
         <TextField
           fullWidth
@@ -47,10 +47,19 @@ export const Search: React.FC<SearchProps> = ({ onSearch }) => {
             setQuery(e.target.value);
             onSearch(e.target.value);
           }}
+          sx={{
+            backgroundColor: 'white',
+            '& .MuiOutlinedInput-root': {
+              height: '40px',
+              '&.Mui-focused fieldset': {
+                borderColor: 'primary.main',
+              },
+            },
+          }}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton type="submit" edge="end">
+                <IconButton type="submit" edge="end" size="small">
                   <SearchIcon />
                 </IconButton>
               </InputAdornment>
