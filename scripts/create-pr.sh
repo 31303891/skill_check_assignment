@@ -3,19 +3,6 @@ set -euo pipefail
 
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
 
-# Options: -y (auto confirm), -t <title>
-AUTO_YES=0
-TITLE_OVERRIDE=""
-while getopts ":yt:" opt; do
-  case "$opt" in
-    y) AUTO_YES=1 ;;
-    t) TITLE_OVERRIDE="$OPTARG" ;;
-    \?) echo "Unknown option: -$OPTARG" >&2; exit 2 ;;
-    :) echo "Option -$OPTARG requires an argument." >&2; exit 2 ;;
-  esac
-done
-shift $((OPTIND-1))
-
 # 1) # 設定されていればupstreamを使用
 upstream_ref="$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || true)"
 base_branch=""
@@ -69,20 +56,26 @@ fi
 echo "Base branch: ${base_branch}"
 
 # 実行予定の確認
-title_default="$(git log -1 --pretty=%s 2>/dev/null || echo "${current_branch}")"
-if [[ -n "${TITLE_OVERRIDE}" ]]; then
-  title="${TITLE_OVERRIDE}"
-else
-  title="${title_default}"
+printf "Create PR from '${current_branch}'? [y/N]: "
+read ans1 || true
+if [[ ! "${ans1}" =~ ^[Yy]$ ]]; then
+  echo "Aborted."
+  exit 0
 fi
-echo "Plan: Create PR from '${current_branch}' into '${base_branch}'"
-echo "Title: ${title}"
-if [[ ${AUTO_YES} -eq 0 ]]; then
-  printf "Proceed? [y/N]: "
-  read ans || true
-  if [[ ! "${ans}" =~ ^[Yy]$ ]]; then
-    echo "Aborted."
-    exit 0
+printf "Create PR into '${base_branch}'? [y/N]: "
+read ans2 || true
+if [[ ! "${ans2}" =~ ^[Yy]$ ]]; then
+  echo "Aborted."
+  exit 0
+fi
+echo "Title will be the commit message of '${current_branch}'"
+  printf "Change title? [y/N]: "
+  read ans3 || true
+  if [[ "${ans3}" =~ ^[Yy]$ ]]; then
+    printf "New title: "
+    read new_title || true
+  if [[ -n "${new_title}" ]]; then
+    title="${new_title}"
   fi
 fi
 
