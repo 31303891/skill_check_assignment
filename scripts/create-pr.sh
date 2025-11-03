@@ -14,6 +14,10 @@ if [[ -n "${upstream_ref}" ]]; then
   else
     base_branch="${upstream_ref}"
   fi
+  # If upstream points to the same branch name, ignore it as base
+  if [[ "${base_branch}" == "${current_branch}" ]]; then
+    base_branch=""
+  fi
 else
   # 2) Pick the nearest local branch whose tip is an ancestor of HEAD
   mapfile -t local_branches < <(git for-each-ref --format='%(refname:short)' refs/heads)
@@ -46,16 +50,27 @@ else
   fi
 fi
 
+ensure_upstream() {
+  # Push current branch to origin if no upstream set, to avoid interactive prompts
+  if ! git rev-parse --abbrev-ref --symbolic-full-name @{upstream} >/dev/null 2>&1; then
+    if git remote get-url origin >/dev/null 2>&1; then
+      git push -u origin "${current_branch}" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
 if git help -a | grep -q "pull-request"; then
   # Use hub's git extension if available
   if [[ -z "${GITHUB_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
     tok="$(gh auth token 2>/dev/null || true)"
     [[ -n "${tok}" ]] && export GITHUB_TOKEN="${tok}"
   fi
+  ensure_upstream
   exec git pull-request -b "${base_branch}" -F .github/pull_request_template.md -o "$@"
 elif command -v gh >/dev/null 2>&1; then
   # Fallback to gh
   title="$(git log -1 --pretty=%s)"
+  ensure_upstream
   exec gh pr create --base "${base_branch}" --title "${title}" --body-file .github/pull_request_template.md "$@"
 else
   echo "Neither 'git pull-request' (hub) nor 'gh' is available." >&2
