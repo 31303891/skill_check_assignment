@@ -5,12 +5,13 @@ current_branch="$(git rev-parse --abbrev-ref HEAD)"
 
 # pushされていないコミットがある場合は早期リターン
 ahead_count="$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
-if [ "${ahead_count}" -eq 1 ]; then
+if [ "${ahead_count}" -eq 0 ]; then
   echo "${ahead_count} commit is not pushed."
+  exit 0
 elif [ "${ahead_count}" -gt 1 ]; then
   echo "${ahead_count} commits are not pushed."
+  exit 0
 fi
-exit 0
 
 # PRがすでに存在する場合は早期リターン
 if command -v gh >/dev/null 2>&1; then
