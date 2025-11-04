@@ -85,8 +85,12 @@ if [[ ! "${ans2}" =~ ^[Yy]$ ]]; then
   echo "Aborted."
   exit 0
 fi
-printf "Enter title and press Enter:"
+printf "Enter title and press Enter: "
 read title || true
+# タイトル入力が空の場合は最後のコミットメッセージかブランチ名を使用
+if [[ -z "${title}" ]]; then
+  title="$(git log -1 --pretty=%s 2>/dev/null || echo "${current_branch}")"
+fi
 
 if git help -a | grep -q "pull-request"; then
   # hubのgit extensionを使用
@@ -94,11 +98,9 @@ if git help -a | grep -q "pull-request"; then
     tok="$(gh auth token 2>/dev/null || true)"
     [[ -n "${tok}" ]] && export GITHUB_TOKEN="${tok}"
   fi
-  ensure_upstream
   exec git pull-request -b "${base_branch}" -m "${title}" -F .github/pull_request_template.md -o "$@"
 elif command -v gh >/dev/null 2>&1; then
   # フォールバックとしてghを使用
-  ensure_upstream
   exec gh pr create --base "${base_branch}" --title "${title}" --body-file .github/pull_request_template.md "$@"
 else
   echo "Neither 'git pull-request' (hub) nor 'gh' is available." >&2
