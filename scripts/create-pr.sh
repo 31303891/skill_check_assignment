@@ -3,13 +3,20 @@ set -euo pipefail
 
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
 
+# upstreamが未設定の場合は早期リターン
+if ! git rev-parse --abbrev-ref --symbolic-full-name @{upstream} >/dev/null 2>&1; then
+  echo -e "No upstream for '${current_branch}'\nTo set upstream, use\n\n\tgit push --set-upstream origin ${current_branch}\n"
+  exit 0
+fi
+
 # pushされていないコミットがある場合は早期リターン
 ahead_count="$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
-if [ "${ahead_count}" -eq 1 ]; then
-  echo "${ahead_count} commit is not pushed"
-  exit 0
-elif [ "${ahead_count}" -gt 1 ]; then
-  echo "${ahead_count} commits are not pushed"
+if [ "${ahead_count}" -gt 0 ]; then
+  if [ "${ahead_count}" -eq 1 ]; then
+    echo "1 commit is not pushed"
+  else
+    echo "${ahead_count} commits are not pushed"
+  fi
   exit 0
 fi
 
