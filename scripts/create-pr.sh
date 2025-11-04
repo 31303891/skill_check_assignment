@@ -3,13 +3,14 @@ set -euo pipefail
 
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
 
-# ブランチがリモートに存在しない場合は早期リターン
-if ! git rev-parse --abbrev-ref --symbolic-full-name @{upstream} >/dev/null 2>&1; then
-  if git remote get-url origin >/dev/null 2>&1; then
-    echo "Push '${current_branch}' branch before creating a PR"
-    exit 0
-  fi
+# pushされていないコミットがある場合は早期リターン
+ahead_count="$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
+if [ "${ahead_count}" -eq 1 ]; then
+  echo "${ahead_count} commit is not pushed."
+elif [ "${ahead_count}" -gt 1 ]; then
+  echo "${ahead_count} commits are not pushed."
 fi
+exit 0
 
 # PRがすでに存在する場合は早期リターン
 if command -v gh >/dev/null 2>&1; then
@@ -36,6 +37,7 @@ if [[ -n "${upstream_ref}" ]]; then
     base_branch=""
   fi
 fi
+echo "upstreamってなんなのだ: ${upstream_ref}"
 
 # 2) 最も近いローカルブランチを取得（HEADの祖先）
 if [[ -z "${base_branch}" ]]; then
@@ -73,7 +75,8 @@ if [[ -z "${base_branch}" ]]; then
 fi
 
 # 実行予定の確認
-printf "Create PR From '${current_branch}'? [y/N]: "
+echo "Create PR"
+printf "From '${current_branch}'? [y/N]: "
 read ans1 || true
 if [[ ! "${ans1}" =~ ^[Yy]$ ]]; then
   echo "Aborted."
