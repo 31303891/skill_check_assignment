@@ -6,21 +6,27 @@ current_branch="$(git rev-parse --abbrev-ref HEAD)"
 # pushされていないコミットがある場合は早期リターン
 ahead_count="$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
 if [ "${ahead_count}" -eq 1 ]; then
-  echo "${ahead_count} commit is not pushed."
+  echo "${ahead_count} commit is not pushed"
   exit 0
 elif [ "${ahead_count}" -gt 1 ]; then
-  echo "${ahead_count} commits are not pushed."
+  echo "${ahead_count} commits are not pushed"
   exit 0
 fi
 
 # PRがすでに存在する場合は早期リターン
 if command -v gh >/dev/null 2>&1; then
-  if gh pr view --head "${current_branch}" >/dev/null 2>&1; then
-    url="$(gh pr view --head "${current_branch}" --json url -q .url 2>/dev/null || true)"
-    if [[ -n "${url}" ]]; then
-      echo "PR already exists for head '${current_branch}': ${url}"
-      exit 0
+  url="$(gh pr list --head "${current_branch}" --state open --json url -q '.[0].url' 2>/dev/null || true)"
+  if [[ -z "${url}" ]]; then
+    # フォークやフィルタの揺らぎに備えて owner:branch でも確認
+    owner_repo="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
+    owner="${owner_repo%%/*}"
+    if [[ -n "${owner}" ]]; then
+      url="$(gh pr list --head "${owner}:${current_branch}" --state open --json url -q '.[0].url' 2>/dev/null || true)"
     fi
+  fi
+  if [[ -n "${url}" ]]; then
+    echo -e "PR already exists\n\t${url}"
+    exit 0
   fi
 fi
 
@@ -80,22 +86,22 @@ echo "Create PR"
 printf "From '${current_branch}'? [y/N]: "
 read ans1 || true
 if [[ ! "${ans1}" =~ ^[Yy]$ ]]; then
-  echo "Aborted."
+  echo "Aborted"
   exit 0
 fi
 printf "Into '${base_branch}'? [y/N]: "
 read ans2 || true
 if [[ ! "${ans2}" =~ ^[Yy]$ ]]; then
-  echo "Aborted."
+  echo "Aborted"
   exit 0
 fi
-printf "Enter title and press Enter: "
-read title || true
-# タイトル入力が空の場合はもう一度入力を促す
-if [[ -z "${title}" ]]; then
+while true; do
   printf "Enter title and press Enter: "
   read title || true
-fi
+  if [[ -n "${title}" ]]; then
+    break
+  fi
+done
 
 if git help -a | grep -q "pull-request"; then
   # hubのgit extensionを使用
@@ -108,6 +114,6 @@ elif command -v gh >/dev/null 2>&1; then
   # フォールバックとしてghを使用
   exec gh pr create --base "${base_branch}" --title "${title}" --body-file .github/pull_request_template.md "$@"
 else
-  echo "Neither 'git pull-request' (hub) nor 'gh' is available." >&2
+  echo "Neither 'git pull-request' (hub) nor 'gh' is available" >&2
   exit 1
 fi
