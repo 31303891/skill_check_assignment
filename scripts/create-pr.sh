@@ -2,6 +2,13 @@
 set -euo pipefail
 
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
+base_branch=""
+
+# upstreamが未設定の場合は早期リターン
+if ! git rev-parse --abbrev-ref --symbolic-full-name @{upstream} >/dev/null 2>&1; then
+  echo -e "No upstream for '${current_branch}'\nTo set upstream, use\n\n\tgit push --set-upstream origin ${current_branch}\n"
+  exit 0
+fi
 
 # upstreamが未設定の場合は早期リターン
 if ! git rev-parse --abbrev-ref --symbolic-full-name @{upstream} >/dev/null 2>&1; then
@@ -37,24 +44,8 @@ if command -v gh >/dev/null 2>&1; then
   fi
 fi
 
-# 1) 設定されていればupstreamを使用
-upstream_ref="$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || true)"
-base_branch=""
-if [[ -n "${upstream_ref}" ]]; then
-  if [[ "${upstream_ref}" == */* ]]; then
-    base_branch="${upstream_ref#*/}"
-  else
-    base_branch="${upstream_ref}"
-  fi
-  # upstreamが同じブランチ名の場合は無視
-  if [[ "${base_branch}" == "${current_branch}" ]]; then
-    base_branch=""
-  fi
-fi
-echo "upstreamってなんなのだ: ${upstream_ref}"
-
-# 2) 最も近いローカルブランチを取得（HEADの祖先）
-if [[ -z "${base_branch}" ]]; then
+# 1) 最も近いローカルブランチをbase_branchに設定（HEADの祖先）
+if [[ -z "${base_branch:-}" ]]; then
   local_branches=()
   while IFS= read -r b; do
     local_branches+=("${b}")
@@ -72,24 +63,16 @@ if [[ -z "${base_branch}" ]]; then
   done
 fi
 
-# 3) リポジトリのデフォルトブランチ（gh）にフォールバック、その後master/mainのヒューリスティック
-if [[ -z "${base_branch}" ]]; then
-  if command -v gh >/dev/null 2>&1; then
-    base_branch="$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)"
-  fi
-  if [[ -z "${base_branch}" ]]; then
-    if git show-ref --verify --quiet refs/heads/master; then
-      base_branch="master"
-    elif git show-ref --verify --quiet refs/heads/main; then
-      base_branch="main"
-    else
-      base_branch="$(git for-each-ref --format='%(refname:short)' --sort=-committerdate refs/heads | head -n1)"
-    fi
+# 2) デフォルトブランチ検出（origin/HEAD）
+if [[ -z "${base_branch:-}" ]]; then
+  default_remote_head="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+  if [[ -n "${default_remote_head}" ]]; then
+    base_branch="${default_remote_head#origin/}"
   fi
 fi
 
-# 実行予定の確認
-echo "Create PR"
+# 実行予定を対話形式で確認
+echo "Create Pull Request"
 printf "From '${current_branch}'? [y/N]: "
 read ans1 || true
 if [[ ! "${ans1}" =~ ^[Yy]$ ]]; then
@@ -110,6 +93,7 @@ while true; do
   fi
 done
 
+# PR作成
 if git help -a | grep -q "pull-request"; then
   # hubのgit extensionを使用
   if [[ -z "${GITHUB_TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
