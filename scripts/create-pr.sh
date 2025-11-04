@@ -3,7 +3,26 @@ set -euo pipefail
 
 current_branch="$(git rev-parse --abbrev-ref HEAD)"
 
-# 1) # 設定されていればupstreamを使用
+# ブランチがリモートに存在しない場合は早期リターン
+if ! git rev-parse --abbrev-ref --symbolic-full-name @{upstream} >/dev/null 2>&1; then
+  if git remote get-url origin >/dev/null 2>&1; then
+    echo "Push '${current_branch}' branch before creating a PR"
+    exit 0
+  fi
+fi
+
+# PRがすでに存在する場合は早期リターン
+if command -v gh >/dev/null 2>&1; then
+  if gh pr view --head "${current_branch}" >/dev/null 2>&1; then
+    url="$(gh pr view --head "${current_branch}" --json url -q .url 2>/dev/null || true)"
+    if [[ -n "${url}" ]]; then
+      echo "PR already exists for head '${current_branch}': ${url}"
+      exit 0
+    fi
+  fi
+fi
+
+# 1) 設定されていればupstreamを使用
 upstream_ref="$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || true)"
 base_branch=""
 if [[ -n "${upstream_ref}" ]]; then
@@ -16,7 +35,6 @@ if [[ -n "${upstream_ref}" ]]; then
   if [[ "${base_branch}" == "${current_branch}" ]]; then
     base_branch=""
   fi
-  echo "Using upstream branch: ${base_branch}"
 fi
 
 # 2) 最も近いローカルブランチを取得（HEADの祖先）
@@ -53,51 +71,22 @@ if [[ -z "${base_branch}" ]]; then
     fi
   fi
 fi
-echo "Base branch: ${base_branch}"
 
 # 実行予定の確認
-printf "Create PR from '${current_branch}'? [y/N]: "
+printf "Create PR From '${current_branch}'? [y/N]: "
 read ans1 || true
 if [[ ! "${ans1}" =~ ^[Yy]$ ]]; then
   echo "Aborted."
   exit 0
 fi
-printf "Create PR into '${base_branch}'? [y/N]: "
+printf "Into '${base_branch}'? [y/N]: "
 read ans2 || true
 if [[ ! "${ans2}" =~ ^[Yy]$ ]]; then
   echo "Aborted."
   exit 0
 fi
-echo "Title will be the commit message of '${current_branch}'"
-  printf "Change title? [y/N]: "
-  read ans3 || true
-  if [[ "${ans3}" =~ ^[Yy]$ ]]; then
-    printf "New title: "
-    read new_title || true
-  if [[ -n "${new_title}" ]]; then
-    title="${new_title}"
-  fi
-fi
-
-ensure_upstream() {
-  # upstreamが設定されていない場合はoriginにpushし、対話的なプロンプトを避ける
-  if ! git rev-parse --abbrev-ref --symbolic-full-name @{upstream} >/dev/null 2>&1; then
-    if git remote get-url origin >/dev/null 2>&1; then
-      git push -u origin "${current_branch}" >/dev/null 2>&1 || true
-    fi
-  fi
-}
-
-# PRがすでに存在する場合は終了
-if command -v gh >/dev/null 2>&1; then
-  if gh pr view --head "${current_branch}" >/dev/null 2>&1; then
-    url="$(gh pr view --head "${current_branch}" --json url -q .url 2>/dev/null || true)"
-    if [[ -n "${url}" ]]; then
-      echo "Existing PR detected for head '${current_branch}': ${url}"
-      exit 0
-    fi
-  fi
-fi
+printf "Enter title and press Enter:"
+read title || true
 
 if git help -a | grep -q "pull-request"; then
   # hubのgit extensionを使用
