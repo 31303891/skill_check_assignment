@@ -5,7 +5,7 @@ current_branch="$(git rev-parse --abbrev-ref HEAD)"
 
 # pushされていないコミットがある場合は早期リターン
 ahead_count="$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
-if [ "${ahead_count}" -eq 0 ]; then
+if [ "${ahead_count}" -eq 1 ]; then
   echo "${ahead_count} commit is not pushed."
   exit 0
 elif [ "${ahead_count}" -gt 1 ]; then
@@ -91,9 +91,10 @@ if [[ ! "${ans2}" =~ ^[Yy]$ ]]; then
 fi
 printf "Enter title and press Enter: "
 read title || true
-# タイトル入力が空の場合は最後のコミットメッセージかブランチ名を使用
+# タイトル入力が空の場合はもう一度入力を促す
 if [[ -z "${title}" ]]; then
-  title="$(git log -1 --pretty=%s 2>/dev/null || echo "${current_branch}")"
+  printf "Enter title and press Enter: "
+  read title || true
 fi
 
 if git help -a | grep -q "pull-request"; then
