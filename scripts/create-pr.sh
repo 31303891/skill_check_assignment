@@ -74,13 +74,13 @@ fi
 # 実行予定を対話形式で確認
 echo "Create Pull Request"
 printf "From '${current_branch}'? [y/N]: "
-read ans1 || true
+read -n 1 ans1 || true
 if [[ ! "${ans1}" =~ ^[Yy]$ ]]; then
   echo "Aborted"
   exit 0
 fi
 printf "Into '${base_branch}'? [y/N]: "
-read ans2 || true
+read -n 1 ans2 || true
 if [[ ! "${ans2}" =~ ^[Yy]$ ]]; then
   echo "Aborted"
   exit 0
